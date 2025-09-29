@@ -5,6 +5,7 @@ import 'package:dargo/core/navigator/route_dispatcher.dart';
 import 'package:dargo/core/reactive/obx.dart';
 import 'package:dargo/core/reactive/rx.dart';
 import 'package:dargo/features/event_bus/event_bus.dart';
+import 'package:dargo/features/realtime/realtime.dart';
 import 'package:flutter/material.dart';
 
 import '../main.dart';
@@ -18,18 +19,27 @@ class AppRouteDispatcher extends RouteDispatcher {
       initialRoute: "user",
       routes: [
         RouteDefinition(
-            name: "home",
-            view: Scaffold(body: Center(child: Center(child: Text("data"))))),
+          name: "home",
+          view: Scaffold(
+            body: Center(child: Center(child: Text("data"))),
+          ),
+        ),
         RouteDefinition(
-            name: "user",
-            view: Test(
-              navigator: context.inject<DargoNavigator>(),
-              service: context.inject<Service>(),
-              eventBus: context.inject<EventBus>(),
-            )),
+          name: "user",
+          view: Test(
+            navigator: context.inject<DargoNavigator>(),
+            service: context.inject<Service>(),
+            eventBus: context.inject<EventBus>(),
+            realtimeCore: context.inject<RealtimeCore>(),
+          ),
+        ),
         RouteDefinition(
-            name: "second",
-            view: ViewTwo(navigator: context.inject<DargoNavigator>()))
+          name: "second",
+          view: ViewTwo(
+            navigator: context.inject<DargoNavigator>(),
+            realtimeCore: context.inject<RealtimeCore>(),
+          ),
+        ),
       ],
     );
   }
@@ -42,10 +52,21 @@ class AppRouteDispatcher extends RouteDispatcher {
 
 class ViewTwo extends StatelessWidget {
   final DargoNavigator navigator;
-  const ViewTwo({super.key, required this.navigator});
+  final RealtimeCore realtimeCore;
+
+  const ViewTwo({
+    super.key,
+    required this.navigator,
+    required this.realtimeCore,
+  });
 
   @override
   Widget build(BuildContext context) {
+    realtimeCore.on(
+      "respuesta",
+      (data) {print("Este es otro evento pero no hago nada jejej");},
+    );
+
     return Scaffold(
       body: Center(
         child: Column(
@@ -53,8 +74,9 @@ class ViewTwo extends StatelessWidget {
           children: [
             Text("Otra vista"),
             ElevatedButton(
-                onPressed: () => navigator.back(),
-                child: const Text("Regresar"))
+              onPressed: () => navigator.back(),
+              child: const Text("Regresar"),
+            ),
           ],
         ),
       ),
@@ -66,10 +88,16 @@ class Test extends StatelessWidget {
   final DargoNavigator navigator;
   final Service service;
   final EventBus eventBus;
+  final RealtimeCore realtimeCore;
+
   @override
   Widget build(BuildContext context) {
     service.test();
     final counter = RxInt(0);
+
+    realtimeCore.on("respuesta", (data) {
+      print("Test recibido: ${data}");
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -84,15 +112,16 @@ class Test extends StatelessWidget {
             Text("HOla dargo que hace?"),
             Obx(() => Text(counter.value.toString())),
             ElevatedButton(
-                onPressed: () => counter.value = counter.value + 1,
-                child: const Text("El child")),
+              onPressed: () => counter.value = counter.value + 1,
+              child: const Text("El child"),
+            ),
             ElevatedButton(
               onPressed: () {
                 eventBus.emit(new TestEvent("Todo ok"));
                 navigator.to("second");
               },
               child: Text("Dale vato loto"),
-            )
+            ),
           ],
         ),
       ),
@@ -104,5 +133,6 @@ class Test extends StatelessWidget {
     required this.navigator,
     required this.service,
     required this.eventBus,
+    required this.realtimeCore,
   });
 }

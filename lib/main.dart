@@ -3,6 +3,7 @@ import 'package:dargo/core/navigator/guards/guard_configuration.dart';
 import 'package:dargo/core/provider/provider.dart';
 import 'package:dargo/features/event_bus/event_bus.dart';
 import 'package:dargo/features/event_bus/event_bus_provider.dart';
+import 'package:dargo/features/realtime/realtime.dart';
 import 'package:dargo/test/app_route_dispatcher.dart';
 import 'package:flutter/material.dart';
 
@@ -16,27 +17,67 @@ void main() async {
       EventBusProvider(context),
       TestProvider(context),
       ListenersProvider(context),
+      RealtimeProvider(context),
     ],
     config: (context) => [
       GuardConfiguration(guard: TestGuard(), applyOn: (routeInfo) => true),
     ],
     routes: (context) => AppRouteDispatcher(context),
     appFactory: (context, initialRoute, navigatorKey, onGenerateRoute) => MyApp(
-        navigatorKey: navigatorKey,
-        initialRoute: initialRoute,
-        onGenerateRoute: onGenerateRoute),
+      navigatorKey: navigatorKey,
+      initialRoute: initialRoute,
+      onGenerateRoute: onGenerateRoute,
+    ),
   ).build();
 
   runApp(application);
+}
+
+class RealtimeProvider extends Provider {
+  final MockAdapter adapter = MockAdapter();
+
+  RealtimeProvider(super.context);
+
+  @override
+  Future<void> register() async {
+    context.register<RealtimeCore>(
+      (context) => RealtimeCore(
+        adapter: adapter,
+        context: {"emitterClientId": "El emitter clientId"},
+        routes: [
+          RealtimeRouteDefinition(event: "test", handler: (ctx) async {
+            ctx.emit<Map<String,dynamic>>.call('respuesta',{
+              "status":"ok",
+              "receivedAt":DateTime.now().toIso8601String(),
+            });
+          }),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Future<void> boot() async {
+    var realtime = context.inject<RealtimeCore>();
+    realtime.start();
+    adapter.startEmittingTestEvents();
+
+    Future.delayed(Duration(seconds: 100),(){
+      adapter.stopEmitting();
+      print("Prueba completada");
+    });
+  }
 }
 
 class ListenersProvider extends Provider {
   ListenersProvider(super.context);
 
   @override
-  Future<void> boot() {
-    // TODO: implement boot
-    throw UnimplementedError();
+  Future<void> boot() async {
+    context.register<EventListener<TestEvent>>((context) => TestListener());
+    context.register<EventListener<TestEvent>>(
+      (context) => SecondTestListener(),
+    );
   }
 
   @override
@@ -53,6 +94,13 @@ class TestListener implements EventListener<TestEvent> {
   @override
   void onEvent(TestEvent event) {
     print("Evento detectado ${event.msg}");
+  }
+}
+
+class SecondTestListener implements EventListener<TestEvent> {
+  @override
+  void onEvent(TestEvent event) {
+    print("El segundo Listener: ${event.msg}");
   }
 }
 
@@ -101,11 +149,12 @@ class MyApp extends StatelessWidget {
   final String initialRoute;
   final Route<dynamic> Function(RouteSettings)? onGenerateRoute;
 
-  const MyApp(
-      {super.key,
-      required this.navigatorKey,
-      required this.initialRoute,
-      this.onGenerateRoute});
+  const MyApp({
+    super.key,
+    required this.navigatorKey,
+    required this.initialRoute,
+    this.onGenerateRoute,
+  });
 
   @override
   Widget build(BuildContext context) {

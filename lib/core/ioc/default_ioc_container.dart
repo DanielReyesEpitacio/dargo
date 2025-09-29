@@ -37,7 +37,14 @@ class DefaultIoCContainer implements IoCContainer {
   List<T> injectAll<T>() {
     final entries = _registry[T];
     if (entries == null) return [];
-    return entries.map((e) => inject<T>(qualifier: e.tag)).toList();
+    return entries.map<T>((entry) {
+      if (entry.scope == BeanScope.singleton) {
+        entry._instance ??= entry.factory(this);
+        return entry._instance!;
+      } else {
+        return entry.factory(this);
+      }
+    }).toList();
   }
 
   @override

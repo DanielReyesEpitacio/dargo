@@ -66,7 +66,7 @@ class _RealtimeRoute {
 class RealtimeCore {
   final List<RealtimeMiddleware> _globalMiddleware = [];
   final Map<String, _RealtimeRoute> _routes = {};
-  final Map<String, List<RealtimeEventCallback>> _eventListeners = {};
+  final Map<String, List<RealtimeEventCallback<dynamic>>> _eventListeners = {};
   late final RealtimeAdapter _adapter;
   Map<String, dynamic> _appContext = {};
   String? _clientId;
@@ -103,7 +103,7 @@ class RealtimeCore {
 
   void emit<T>(String event, T data) {
     final callbacks = _eventListeners[event] ?? [];
-    for (final cb in callbacks) {
+    for (final RealtimeEventCallback<T> cb in callbacks.cast<RealtimeEventCallback<T>>()) {
       cb(data);
     }
   }
